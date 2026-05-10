@@ -97,19 +97,19 @@ async def process_roll(update_or_query, data_list):
         wa_phone = "880" + phone[1:] if (phone.startswith("0") and len(phone) >= 11) else phone
         
         final_text += (
-            f"📄 NU Result {i}\n"
+            f"🎯 NU Result {i}\n"
             f"<pre>\n"
-            f"Transaction ID: {data['Transaction ID']}\n"
-            f"College       : {data['College']}\n"
-            f"Name          : {data['Name']}\n"
-            f"Reg No        : {data['Reg No']}\n"
-            f"Class Roll    : {data['Class Roll']}\n"
-            f"Subject       : {data['Subject']}\n"
-            f"Year          : {data['Year']}\n"
-            f"Session       : {data['Session']}\n"
-            f"Mobile        : {data['Mobile']}\n"
-            f"Amount(BDT)   : {data['Amount(BDT)']}\n"
-            f"Date          : {data['Date']}\n"
+            f"🆔 Transaction ID: {data['Transaction ID']}\n"
+            f"🏫 College       : {data['College']}\n"
+            f"👤 Name          : {data['Name']}\n"
+            f"🪪 Reg No        : {data['Reg No']}\n"
+            f"📇 Class Roll    : {data['Class Roll']}\n"
+            f"🩺 Subject       : {data['Subject']}\n"
+            f"📆 Year          : {data['Year']}\n"
+            f"​​📅 Session       : {data['Session']}\n"
+            f"📳 Mobile        : {data['Mobile']}\n"
+            f"💰 Amount(BDT)   : {data['Amount(BDT)']}\n"
+            f"🗓️ Date          : {data['Date']}\n"
             f"</pre>\n\n"
         )
         

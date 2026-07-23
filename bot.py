@@ -32,7 +32,7 @@ def keep_alive():
 
 # ----------- 2. CONFIGURATION -----------
 # আপনার দেওয়া টোকেনটি এখানে বসানো হয়েছে
-BOT_TOKEN = "8559807282:AAF5TWqwQZH0l1ZrRCKvhAWZO2bJfiGN1ZA"
+BOT_TOKEN = "8709194548:AAEQkYk88qxDzjt4_zzrRmIUoQEtNEDQtH8"
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",

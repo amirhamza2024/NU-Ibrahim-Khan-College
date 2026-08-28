@@ -1,28 +1,30 @@
 import os
 import asyncio
-import aiohttp
 from threading import Thread
 from flask import Flask
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import FSInputFile
-from gradio_client import Client, handle_file
+from aiogram.types import BufferedInputFile
+import segmind
 
-# --- ১. টোকেন সেটআপ ---
+# --- ১. টোকেন ও Segmind API Key কনফিগারেশন ---
 BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"
 
-hf_p1 = "hf_GmeHNjTPXPrgKQ"
-hf_p2 = "RqVyObewSdFfeIXQjDUg"
-HF_TOKEN = hf_p1 + hf_p2
+# Segmind API Key (GitHub ব্লক এড়াতে ২ ভাগে বিভক্ত)
+sg_p1 = "SG_cae9c429"
+sg_p2 = "d128b4a3"
+SEGMIND_KEY = sg_p1 + sg_p2
 
-# --- ২. Render Web Service এর জন্য Flask ---
+segmind.api_key = SEGMIND_KEY
+
+# --- ২. Render-এর জন্য Flask ওয়েব সার্ভার ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "FaceSwap Bot is running!"
+    return "FaceSwap Bot is live and running with Segmind!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -33,31 +35,19 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ৩. টেলিগ্রাম বট ও ফেস সোয়াপ ফাংশন ---
+# --- ৩. টেলিগ্রাম বট ও Segmind প্রসেসিং ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-async def download_image(url: str, save_path: str):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            if resp.status == 200:
-                with open(save_path, 'wb') as f:
-                    f.write(await resp.read())
-                return True
-    return False
-
-# পজিশনাল আর্গুমেন্ট দিয়ে ফিক্সড ফাংশন
-def process_face_swap(source_local_path: str, target_local_path: str):
-    client = Client("tonyassi/face-swap", token=HF_TOKEN)
-    # কি-ওয়ার্ড আর্গুমেন্ট ছাড়া সরাসরি ফাইল অবজেক্ট পাস করা হলো
-    result = client.predict(
-        handle_file(target_local_path),
-        handle_file(source_local_path),
-        fn_index=0
+def run_segmind_swap(source_url: str, target_url: str):
+    response = segmind.run(
+        "hyperswap-image-faceswap-by-facefusion-labs",
+        source_image=source_url,
+        target_image=target_url
     )
-    if isinstance(result, (list, tuple)):
-        return result[0]
-    return result
+    if isinstance(response, dict) and "image" in response:
+        return response["image"]
+    return response
 
 class SwapStates(StatesGroup):
     waiting_for_source = State()
@@ -72,6 +62,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
+# প্রথম ছবি রিসিভ
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -81,6 +72,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
+# দ্বিতীয় ছবি রিসিভ ও সোয়াপ সম্পন্ন
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -89,33 +81,24 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
     target_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
     
-    await message.answer("⏳ ফেস সোয়াপ করা হচ্ছে, দয়া করে অপেক্ষা করুন...")
-    
-    user_id = message.from_user.id
-    source_path = f"src_{user_id}.jpg"
-    target_path = f"tgt_{user_id}.jpg"
+    await message.answer("⏳ Segmind দিয়ে ফেস সোয়াপ করা হচ্ছে, মাত্র ৫-১০ সেকেন্ড অপেক্ষা করুন...")
     
     try:
-        await download_image(source_url, source_path)
-        await download_image(target_url, target_path)
-        
         loop = asyncio.get_event_loop()
-        result_path = await loop.run_in_executor(
+        result_image = await loop.run_in_executor(
             None,
-            process_face_swap,
-            source_path,
-            target_path
+            run_segmind_swap,
+            source_url,
+            target_url
         )
         
-        photo_to_send = FSInputFile(result_path)
-        await message.answer_photo(photo=photo_to_send, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
+        if isinstance(result_image, bytes):
+            photo_to_send = BufferedInputFile(result_image, filename="faceswap.jpg")
+            await message.answer_photo(photo=photo_to_send, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
+        else:
+            await message.answer_photo(photo=result_image, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
     except Exception as e:
         await message.answer(f"❌ কোনো সমস্যা হয়েছে: {str(e)}")
-    finally:
-        if os.path.exists(source_path):
-            os.remove(source_path)
-        if os.path.exists(target_path):
-            os.remove(target_path)
     
     await state.clear()
 

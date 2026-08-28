@@ -10,7 +10,7 @@ from replicate.client import Client
 
 # --- ১. টোকেন সেটআপ ---
 BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"  # আপনার আসল বট টোকেন দিন
-REPLICATE_API_TOKEN = "r8_eqQ9oj4H0gZkzRJZvxgDiFAI1aVmgIg3JBcCR"                     # আপনার Replicate টোকেন দিন
+REPLICATE_API_TOKEN = "r8_7KCb6JDluZHbZSHhzvGIezEnkEmlqvz0J4IHN"                     # আপনার Replicate টোকেন দিন
 
 # --- ২. Flask সার্ভার (Render এর Port Binding এর জন্য) ---
 app = Flask(__name__)

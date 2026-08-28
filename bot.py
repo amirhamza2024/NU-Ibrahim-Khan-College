@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "FaceSwap Bot is live and running!"
+    return "FaceSwap Bot is running perfectly!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -36,9 +36,9 @@ def keep_alive():
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# ক্র্যাশ এড়াতে রিকোয়েস্ট আসার সময় ক্লায়েন্ট তৈরি হবে
+# ফেস সোয়াপ প্রসেস (token প্যারামিটার ফিক্সড)
 def process_face_swap(source_url: str, target_url: str):
-    client = Client("tuan2308/face-swap", hf_token=HF_TOKEN)
+    client = Client("tuan2308/face-swap", token=HF_TOKEN)
     result = client.predict(
         source_image=handle_file(source_url),
         target_image=handle_file(target_url),
@@ -59,7 +59,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি নেওয়া
+# প্রথম ছবি রিসিভ
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -69,7 +69,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি নেওয়া এবং ফেস সোয়াপ করা
+# দ্বিতীয় ছবি রিসিভ ও সোয়াপ সম্পন্ন
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()

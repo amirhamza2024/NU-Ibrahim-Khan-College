@@ -8,11 +8,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from replicate.client import Client
 
-# Render এর Environment থেকে টোকেন সংগ্রহ করবে (গিটহাবে টোকেন দেওয়া লাগবে না)
+# --- এনভায়রনমেন্ট ভ্যারিয়েবল লোড ---
 BOT_TOKEN = os.environ.get("8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o")
 REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 
-# --- Flask Server ---
+if not BOT_TOKEN or not REPLICATE_API_TOKEN:
+    raise ValueError("Render Environment-এ BOT_TOKEN অথবা REPLICATE_API_TOKEN সেট করা হয়নি!")
+
+# --- Flask সার্ভার ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -28,7 +31,7 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- Telegram Bot & Replicate Setup ---
+# --- টেলিগ্রাম ও রেপ্লিকেট সেটআপ ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 replicate_client = Client(api_token=REPLICATE_API_TOKEN)
@@ -39,7 +42,7 @@ class SwapStates(StatesGroup):
 
 @dp.message(F.text == "/start")
 async def start_cmd(message: types.Message):
-    await message.answer("🎭 **FaceSwap Bot-এ স্বাগতম!**\n\nফেস সোয়াপ করতে **/swap** কমান্ড দিন।")
+    await message.answer("🎭 FaceSwap Bot-এ স্বাগতম!\n\nফেস সোয়াপ করতে /swap কমান্ড দিন।")
 
 @dp.message(F.text == "/swap")
 async def swap_cmd(message: types.Message, state: FSMContext):
@@ -73,7 +76,6 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
                 "input_image": target_url
             }
         )
-        
         result_url = str(output)
         await message.answer_photo(photo=result_url, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
     except Exception as e:

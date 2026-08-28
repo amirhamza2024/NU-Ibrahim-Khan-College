@@ -9,13 +9,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile
 import requests
 
-# --- ১. টোকেন ও Segmind API Key কনফিগারেশন ---
+# --- ১. কনফিগারেশন ---
 BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"
-
-# Segmind API Key (Environment variable অথবা সরাসরি কি)
 SEGMIND_KEY = os.environ.get("SEGMIND_KEY", "SG_fb61e977375076e3").strip()
 
-# --- ২. Render Web Service-এর জন্য Flask সার্ভার ---
+# --- ২. Flask সার্ভার (Render Keep-Alive) ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -31,17 +29,16 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ৩. টেলিগ্রাম বট ও Segmind Direct API ফাংশন ---
+# --- ৩. টেলিগ্রাম বট ও Segmind ফাংশন ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 def run_segmind_swap(source_url: str, target_url: str):
     endpoint = "https://api.segmind.com/v1/hyperswap-image-faceswap-by-facefusion-labs"
     
-    # 401 এরর এড়াতে x-api-key এবং Authorization দুটি হেডারই রাখা হয়েছে
+    # শুধুমাত্র x-api-key হেডার ব্যবহার করা হয়েছে
     headers = {
         "x-api-key": SEGMIND_KEY,
-        "Authorization": f"Bearer {SEGMIND_KEY}",
         "Content-Type": "application/json"
     }
     
@@ -78,7 +75,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি রিসিভ
+# প্রথম ছবি গ্রহণ
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -88,7 +85,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি রিসিভ ও সোয়াপ প্রসেস
+# দ্বিতীয় ছবি গ্রহণ ও প্রসেসিং
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()

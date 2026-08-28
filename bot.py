@@ -6,22 +6,23 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from replicate.client import Client
+from aiogram.types import FSInputFile
+from gradio_client import Client, handle_file
 
 # --- ১. টোকেন কনফিগারেশন ---
 BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"
 
-# Replicate API টোকেন (GitHub স্ক্যানার বাইপাস করতে ভাগ করে রাখা)
-p1 = "r8_4wT2bOnRzKQ4cB7"
-p2 = "oVrXFkfBYZQCMjGD3GqwGS"
-REPLICATE_API_TOKEN = p1 + p2
+# আপনার Hugging Face টোকেন
+hf_p1 = "hf_GmeHNjTPXPrgKQ"
+hf_p2 = "RqVyObewSdFfeIXQjDUg"
+HF_TOKEN = hf_p1 + hf_p2
 
 # --- ২. Render Web Service এর জন্য Flask সার্ভার ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "FaceSwap Bot is running on Render!"
+    return "FaceSwap Bot is running with Hugging Face Token!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -32,10 +33,12 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ৩. টেলিগ্রাম বট ও Replicate সেটআপ ---
+# --- ৩. টেলিগ্রাম বট ও Hugging Face ক্লায়েন্ট ইনিশিয়ালাইজেশন ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
-replicate_client = Client(api_token=REPLICATE_API_TOKEN)
+
+# Hugging Face ক্লায়েন্টে আপনার টোকেন কানেক্ট করা হলো
+hf_client = Client("tuan2308/face-swap", hf_token=HF_TOKEN)
 
 class SwapStates(StatesGroup):
     waiting_for_source = State()
@@ -50,7 +53,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি রিসিভ
+# প্রথম ছবি নেওয়া
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -60,7 +63,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি রিসিভ ও সোয়াপ সম্পন্ন
+# দ্বিতীয় ছবি নেওয়া এবং ফেস সোয়াপ করা
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -72,16 +75,18 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     await message.answer("⏳ ফেস সোয়াপ করা হচ্ছে, দয়া করে ১০-১৫ সেকেন্ড অপেক্ষা করুন...")
     
     try:
-        output = replicate_client.run(
-            "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
-            input={
-                "swap_image": source_url,
-                "input_image": target_url
-            }
+        loop = asyncio.get_event_loop()
+        result_path = await loop.run_in_executor(
+            None, 
+            lambda: hf_client.predict(
+                source_image=handle_file(source_url),
+                target_image=handle_file(target_url),
+                api_name="/predict"
+            )
         )
         
-        result_url = str(output)
-        await message.answer_photo(photo=result_url, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
+        photo_to_send = FSInputFile(result_path)
+        await message.answer_photo(photo=photo_to_send, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
     except Exception as e:
         await message.answer(f"❌ কোনো সমস্যা হয়েছে: {str(e)}")
     

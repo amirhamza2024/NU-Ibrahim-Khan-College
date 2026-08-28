@@ -1,5 +1,6 @@
 import os
 import asyncio
+import aiohttp
 from threading import Thread
 from flask import Flask
 from aiogram import Bot, Dispatcher, types, F
@@ -36,12 +37,22 @@ def keep_alive():
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# ফেস সোয়াপ প্রসেস (api_name এরর ফিক্সড)
-def process_face_swap(source_url: str, target_url: str):
+# ইমেজ ডাউনলোড ফাংশন
+async def download_image(url: str, save_path: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                with open(save_path, 'wb') as f:
+                    f.write(await resp.read())
+                return True
+    return False
+
+# ফেস সোয়াপ প্রসেস
+def process_face_swap(source_local_path: str, target_local_path: str):
     client = Client("tonyassi/face-swap", token=HF_TOKEN)
     result = client.predict(
-        handle_file(source_url),
-        handle_file(target_url),
+        handle_file(source_local_path), # Source image
+        handle_file(target_local_path), # Target image
         fn_index=0
     )
     return result
@@ -59,7 +70,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি নেওয়া
+# প্রথম ছবি রিসিভ
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -69,7 +80,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি নেওয়া এবং ফেস সোয়াপ করা
+# দ্বিতীয় ছবি রিসিভ ও সোয়াপ সম্পন্ন
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -78,21 +89,36 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
     target_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
     
-    await message.answer("⏳ ফেস সোয়াপ করা হচ্ছে, দয়া করে ১৫-২০ সেকেন্ড অপেক্ষা করুন...")
+    await message.answer("⏳ ছবি প্রসেসিং ও ফেস সোয়াপ করা হচ্ছে, দয়া করে অপেক্ষা করুন...")
+    
+    # টেম্পোরারি ফাইল নেম তৈরি
+    user_id = message.from_user.id
+    source_path = f"source_{user_id}.jpg"
+    target_path = f"target_{user_id}.jpg"
     
     try:
+        # ছবি দুটি লোকালি ডাউনলোড করা
+        await download_image(source_url, source_path)
+        await download_image(target_url, target_path)
+        
         loop = asyncio.get_event_loop()
         result_path = await loop.run_in_executor(
             None,
             process_face_swap,
-            source_url,
-            target_url
+            source_path,
+            target_path
         )
         
         photo_to_send = FSInputFile(result_path)
         await message.answer_photo(photo=photo_to_send, caption="✨ আপনার সোয়াপ করা ছবি তৈরি!")
     except Exception as e:
         await message.answer(f"❌ কোনো সমস্যা হয়েছে: {str(e)}")
+    finally:
+        # প্রসেস শেষে লোকাল ছবিগুলো মুছে জায়গা খালি করা
+        if os.path.exists(source_path):
+            os.remove(source_path)
+        if os.path.exists(target_path):
+            os.remove(target_path)
     
     await state.clear()
 

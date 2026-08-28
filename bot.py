@@ -12,7 +12,6 @@ from gradio_client import Client, handle_file
 # --- ১. টোকেন কনফিগারেশন ---
 BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"
 
-# আপনার Hugging Face টোকেন
 hf_p1 = "hf_GmeHNjTPXPrgKQ"
 hf_p2 = "RqVyObewSdFfeIXQjDUg"
 HF_TOKEN = hf_p1 + hf_p2
@@ -22,7 +21,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "FaceSwap Bot is running with Hugging Face Token!"
+    return "FaceSwap Bot is live and running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -33,12 +32,19 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ৩. টেলিগ্রাম বট ও Hugging Face ক্লায়েন্ট ইনিশিয়ালাইজেশন ---
+# --- ৩. টেলিগ্রাম বট ও Hugging Face ফাংশন ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Hugging Face ক্লায়েন্টে আপনার টোকেন কানেক্ট করা হলো
-hf_client = Client("tuan2308/face-swap", hf_token=HF_TOKEN)
+# ক্র্যাশ এড়াতে রিকোয়েস্ট আসার সময় ক্লায়েন্ট তৈরি হবে
+def process_face_swap(source_url: str, target_url: str):
+    client = Client("tuan2308/face-swap", hf_token=HF_TOKEN)
+    result = client.predict(
+        source_image=handle_file(source_url),
+        target_image=handle_file(target_url),
+        api_name="/predict"
+    )
+    return result
 
 class SwapStates(StatesGroup):
     waiting_for_source = State()
@@ -77,12 +83,10 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     try:
         loop = asyncio.get_event_loop()
         result_path = await loop.run_in_executor(
-            None, 
-            lambda: hf_client.predict(
-                source_image=handle_file(source_url),
-                target_image=handle_file(target_url),
-                api_name="/predict"
-            )
+            None,
+            process_face_swap,
+            source_url,
+            target_url
         )
         
         photo_to_send = FSInputFile(result_path)

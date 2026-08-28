@@ -8,19 +8,18 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from replicate.client import Client
 
-# --- ১. টোকেন সেটআপ ---
-BOT_TOKEN = "8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o"  # আপনার আসল বট টোকেন দিন
-REPLICATE_API_TOKEN = "r8_7KCb6JDluZHbZSHhzvGIezEnkEmlqvz0J4IHN"                     # আপনার Replicate টোকেন দিন
+# Render এর Environment থেকে টোকেন সংগ্রহ করবে (গিটহাবে টোকেন দেওয়া লাগবে না)
+BOT_TOKEN = os.environ.get("8938455906:AAGOr-_VXu7r6OPuEp3P5OI_aRt0Do7qX9o")
+REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 
-# --- ২. Flask সার্ভার (Render এর Port Binding এর জন্য) ---
+# --- Flask Server ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is alive and running!"
+    return "Bot is live and running!"
 
 def run_flask():
-    # Render নিজে থেকে PORT ভ্যারিয়েবল পাঠায়, না পেলে ডিফল্ট 8080 নিবে
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
@@ -29,7 +28,7 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# --- ৩. টেলিগ্রাম বট সেটআপ ---
+# --- Telegram Bot & Replicate Setup ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 replicate_client = Client(api_token=REPLICATE_API_TOKEN)
@@ -47,7 +46,6 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি নেওয়া
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -57,7 +55,6 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি নেওয়া এবং ফেস সোয়াপ করা
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -84,9 +81,8 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     
     await state.clear()
 
-# --- ৪. মেইন ফাংশন ---
 async def main():
-    keep_alive()  # ব্যাকগ্রাউন্ডে Flask সার্ভার চালু করবে
+    keep_alive()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

@@ -36,13 +36,13 @@ def keep_alive():
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# সক্রিয় Hugging Face স্পেস দিয়ে প্রসেসিং
+# ফেস সোয়াপ প্রসেস (api_name এরর ফিক্সড)
 def process_face_swap(source_url: str, target_url: str):
     client = Client("tonyassi/face-swap", token=HF_TOKEN)
     result = client.predict(
-        source_image=handle_file(source_url),
-        target_image=handle_file(target_url),
-        api_name="/predict"
+        handle_file(source_url),
+        handle_file(target_url),
+        fn_index=0
     )
     return result
 
@@ -59,7 +59,7 @@ async def swap_cmd(message: types.Message, state: FSMContext):
     await message.answer("১️⃣ যার মুখ বসাতে চান (Source Face), তার ছবি পাঠান:")
     await state.set_state(SwapStates.waiting_for_source)
 
-# প্রথম ছবি রিসিভ
+# প্রথম ছবি নেওয়া
 @dp.message(SwapStates.waiting_for_source, F.photo)
 async def get_source(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
@@ -69,7 +69,7 @@ async def get_source(message: types.Message, state: FSMContext):
     await message.answer("✅ প্রথম ছবি পেয়েছি!\n\n২️⃣ এবার মূল ছবি (Target Body/Image) পাঠান যেটিতে মুখ বসবে:")
     await state.set_state(SwapStates.waiting_for_target)
 
-# দ্বিতীয় ছবি রিসিভ ও সোয়াপ সম্পন্ন
+# দ্বিতীয় ছবি নেওয়া এবং ফেস সোয়াপ করা
 @dp.message(SwapStates.waiting_for_target, F.photo)
 async def get_target_and_process(message: types.Message, state: FSMContext):
     data = await state.get_data()

@@ -1,4 +1,3 @@
-aiogram>=3.0.0
 aiogram
-segmind
+segmind>=1.1.0
 flask

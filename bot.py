@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "FaceSwap Bot is running perfectly!"
+    return "FaceSwap Bot is live and running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -36,9 +36,9 @@ def keep_alive():
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# ফেস সোয়াপ প্রসেস (token প্যারামিটার ফিক্সড)
+# সক্রিয় Hugging Face স্পেস দিয়ে প্রসেসিং
 def process_face_swap(source_url: str, target_url: str):
-    client = Client("tuan2308/face-swap", token=HF_TOKEN)
+    client = Client("tonyassi/face-swap", token=HF_TOKEN)
     result = client.predict(
         source_image=handle_file(source_url),
         target_image=handle_file(target_url),
@@ -78,7 +78,7 @@ async def get_target_and_process(message: types.Message, state: FSMContext):
     file = await bot.get_file(message.photo[-1].file_id)
     target_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
     
-    await message.answer("⏳ ফেস সোয়াপ করা হচ্ছে, দয়া করে ১০-১৫ সেকেন্ড অপেক্ষা করুন...")
+    await message.answer("⏳ ফেস সোয়াপ করা হচ্ছে, দয়া করে ১৫-২০ সেকেন্ড অপেক্ষা করুন...")
     
     try:
         loop = asyncio.get_event_loop()
